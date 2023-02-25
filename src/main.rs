@@ -17,6 +17,8 @@ enum YshKw {
     YPipe,
     YIn,
     YOut,
+    YOpen,
+    YClose,
     YToken(String),
 }
 fn parse_words(s: &str) -> Vec<YshKw> {
@@ -30,6 +32,8 @@ fn conv(s: &str) -> YshKw {
         "|" => YshKw::YPipe,
         "<" => YshKw::YIn,
         ">" => YshKw::YOut,
+        "(" => YshKw::YOpen,
+        ")" => YshKw::YClose,
         s => YshKw::YToken(s.to_string()),
     }
 }
