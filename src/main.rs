@@ -37,6 +37,8 @@ fn conv(s: &str) -> YshKw {
 fn main() {
     loop {
         let mut s = String::new();
+        print!("input words to parse > ");
+        stdout().flush().unwrap();
         stdin().read_line(&mut s).unwrap();
         println!("{:?}", parse_words(&s[..]));
         stdout().flush().unwrap();
