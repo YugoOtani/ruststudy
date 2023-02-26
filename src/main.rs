@@ -1,3 +1,5 @@
+use pom::parser::*;
+use pom::Parser;
 use std::any::type_name;
 use std::io::{stdin, stdout, Write};
 enum Ysh {
@@ -21,22 +23,6 @@ enum YshKw {
     YClose,
     YToken(String),
 }
-fn parse_words(s: &str) -> Vec<YshKw> {
-    s.split(' ').map(|w| conv(w)).collect()
-}
-fn conv(s: &str) -> YshKw {
-    match s {
-        ";" => YshKw::YSeq,
-        "&&" => YshKw::YAnd,
-        "||" => YshKw::YOr,
-        "|" => YshKw::YPipe,
-        "<" => YshKw::YIn,
-        ">" => YshKw::YOut,
-        "(" => YshKw::YOpen,
-        ")" => YshKw::YClose,
-        s => YshKw::YToken(s.to_string()),
-    }
-}
 
 fn main() {
     loop {
@@ -44,11 +30,23 @@ fn main() {
         print!("input words to parse > ");
         stdout().flush().unwrap();
         stdin().read_line(&mut s).unwrap();
-        println!("{:?}", parse_words(&s[..]));
+        println!("{:?}", exp().parse(&mut s.as_bytes()));
         stdout().flush().unwrap();
     }
 }
+fn exp() -> Parser<u8, Vec<u8>> {
+    let integer = one_of(b"0123456789").repeat(0..);
+    let space = sym(b' ').repeat(0..);
+    end().map(|_| vec![])
+        | (integer + space * call(exp)).map(|(mut v, mut e)| {
+            v.append(&mut e);
+            v
+        })
+}
+fn space() -> Parser<u8, ()> {
+    one_of(b" \t\r\n").repeat(0..).discard()
+}
 
-fn tn<T>(_: T) {
-    println!("{:?}", type_name::<T>())
+fn tn<T>(_: &T) {
+    println!("{:?}", type_name::<*const T>())
 }
