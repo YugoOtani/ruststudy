@@ -30,23 +30,14 @@ fn main() {
         print!("input words to parse > ");
         stdout().flush().unwrap();
         stdin().read_line(&mut s).unwrap();
-        println!("{:?}", exp().parse(&mut s.as_bytes()));
+        let integer = one_of(b"0123456789").repeat(0..);
+        //let brace = sym(b'(') * integer - sym(b')');
+        tn(&integer);
+        println!("{:?} {:?}", s.as_bytes(), integer.parse(&s.as_bytes()));
         stdout().flush().unwrap();
     }
 }
-fn exp() -> Parser<u8, Vec<u8>> {
-    let integer = one_of(b"0123456789").repeat(0..);
-    let space = sym(b' ').repeat(0..);
-    end().map(|_| vec![])
-        | (integer + space * call(exp)).map(|(mut v, mut e)| {
-            v.append(&mut e);
-            v
-        })
-}
-fn space() -> Parser<u8, ()> {
-    one_of(b" \t\r\n").repeat(0..).discard()
-}
 
-fn tn<T>(_: &T) {
-    println!("{:?}", type_name::<*const T>())
+fn tn<T>(_: T) {
+    println!("{:?}", type_name::<T>())
 }
