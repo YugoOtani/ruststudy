@@ -1,39 +1,63 @@
-use pom::parser::is_a;
 use pom::parser::*;
 use std::any::type_name;
 use std::io::{stdin, stdout, Write};
 
 const RESERVED_CHAR: &[u8; 11] = b";&|<>() \n\t\r";
 #[derive(Debug)]
-enum Ysh {
-    YCommand(String),
-    YSeq(Box<Ysh>, Box<Ysh>),  // A; B
-    YAnd(Box<Ysh>, Box<Ysh>),  // A && B
-    YOr(Box<Ysh>, Box<Ysh>),   // A || B
-    YPipe(Box<Ysh>, Box<Ysh>), // A | B
-    YIn(Box<Ysh>, String),     // A < file
-    YOut(Box<Ysh>, String),    // A > file
-    YSub(Box<Ysh>),            // (A)
+pub enum Ysh {
+    YCommand(Command),
+    YSeq(Command, Box<Ysh>),  // A; B
+    YAnd(Command, Box<Ysh>),  // A && B
+    YOr(Command, Box<Ysh>),   // A || B
+    YPipe(Command, Box<Ysh>), // A | B
+    YIn(Box<Ysh>, String),    // A < file
+    YOut(Box<Ysh>, String),   // A > file
+    YSub(Box<Ysh>),           // (A)
+}
+
+#[derive(Debug)]
+pub struct Command {
+    s: String,
 }
 fn main() {
-    let mut s = String::new();
-    stdout().flush().unwrap();
-    stdin().read_line(&mut s).unwrap();
-    println!("{:?}", p_command().parse(s.as_bytes()));
+    loop {
+        let mut s = String::new();
+        stdout().flush().unwrap();
+        stdin().read_line(&mut s).unwrap();
+        println!("{:?}", p_ysh().parse(s.as_bytes()));
+    }
 }
-fn p_command<'a>() -> Parser<'a, u8, Ysh> {
+
+fn com<'a>() -> Parser<'a, u8, Command> {
+    id().map(|s| Command { s })
+}
+fn id<'a>() -> Parser<'a, u8, String> {
     let com = space() * none_of(RESERVED_CHAR).repeat(1..) - space();
-    com.convert(|u8s| String::from_utf8(u8s)).map(Ysh::YCommand)
+    com.convert(|u8s| String::from_utf8(u8s))
 }
-fn exp<'a>() -> Parser<'a, u8, Vec<u8>> {
-    let integer = one_of(b"0123456789").repeat(0..);
-    let space = sym(b' ').repeat(0..);
-    end().map(|_| vec![])
-        | (integer + space * call(exp)).map(|(mut v, mut e)| {
-            v.append(&mut e);
-            v
-        })
+/*
+F -> (a) | S;a ... | a>S | a<S
+a -> (a) | S;a ... | C
+*/
+fn p_ysh<'a>() -> Parser<'a, u8, Ysh> {
+    (call(p_ysh2) - sym(b'>') + id()).map(|(c, fname)| Ysh::YIn(Box::new(c), fname))
+        | (call(p_ysh2) - sym(b'<') + id()).map(|(c, fname)| Ysh::YOut(Box::new(c), fname))
+        | (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
+        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
+        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
+        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
+        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
 }
+fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
+    (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
+        | (com() - end()).map(Ysh::YCommand)
+        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
+        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
+        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
+        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
+        | com().map(Ysh::YCommand)
+}
+
 fn space<'a>() -> Parser<'a, u8, ()> {
     one_of(b" \t\r\n").repeat(0..).discard()
 }
