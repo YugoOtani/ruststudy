@@ -8,11 +8,10 @@ fn main() {
         stdout().flush().unwrap();
         let mut buf = String::new();
         match stdin().read_line(&mut buf) {
-            Ok(_) => println!("{:?}", p_ysh().parse(buf.as_bytes())),
-            /*match p_ysh().parse(buf.as_bytes()) {
+            Ok(_) => match p_ysh().parse(buf.as_bytes()) {
                 Ok(res) => exec_node(&res),
                 Err(e) => println!("{:?}", e),
-            },*/
+            },
             Err(error) => println!("error: {error}"),
         }
     }
@@ -44,7 +43,7 @@ impl Command {
         } else {
             Ok(Command {
                 com: v[0].clone(),
-                args: v,
+                args: v[1..].to_vec(),
             })
         }
     }
@@ -76,12 +75,15 @@ fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
         | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
         | com().map(Ysh::YCommand)
 }
-/*
+
 fn exec_node(ysh: &Ysh) {
     match ysh {
         //https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.exec
-        Ysh::YCommand(Command { s: cmd }) => {
-            match process::Command::new(format!("/bin/{cmd}")).output() {
+        Ysh::YCommand(Command { com, args }) => {
+            match process::Command::new(format!("/bin/{com}"))
+                .args(args)
+                .output()
+            {
                 Ok(msg) => {
                     stdout().write_all(&msg.stdout).unwrap();
                     stderr().write_all(&msg.stderr).unwrap();
@@ -91,7 +93,7 @@ fn exec_node(ysh: &Ysh) {
         }
         _ => todo!("other command"),
     }
-}*/
+}
 fn space<'a>() -> Parser<'a, u8, ()> {
     one_of(b" \t\r\n").repeat(0..).discard()
 }
