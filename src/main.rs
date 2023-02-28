@@ -1,12 +1,7 @@
 use pom::parser::*;
 use std::io;
 use std::io::{stdin, stdout, Write};
-fn interpret_line(input: String) {
-    if &input[..] == "exit" {
-        std::process::exit(0);
-    }
-    println!("{:?}", input);
-}
+
 fn main() {
     for i in 1.. {
         print!("ysh[{i}] 🐈 > ");
@@ -22,7 +17,7 @@ fn main() {
     }
     //todo: ctrl-c and ctrl-d
 }
-
+//todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
 const RESERVED_CHAR: &[u8; 11] = b";&|<>() \n\t\r";
 #[derive(Debug)]
 enum Ysh {
