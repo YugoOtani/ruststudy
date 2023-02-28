@@ -8,10 +8,11 @@ fn main() {
         stdout().flush().unwrap();
         let mut buf = String::new();
         match stdin().read_line(&mut buf) {
-            Ok(_) => match p_ysh().parse(buf.as_bytes()) {
+            Ok(_) => println!("{:?}", p_ysh().parse(buf.as_bytes())),
+            /*match p_ysh().parse(buf.as_bytes()) {
                 Ok(res) => exec_node(&res),
                 Err(e) => println!("{:?}", e),
-            },
+            },*/
             Err(error) => println!("error: {error}"),
         }
     }
@@ -33,15 +34,28 @@ enum Ysh {
 
 #[derive(Debug)]
 struct Command {
-    s: String,
+    com: String,
+    args: Vec<String>,
 }
-
+impl Command {
+    fn new(v: Vec<String>) -> Result<Command, String> {
+        if v.len() == 0 {
+            Err(String::from("empty command"))
+        } else {
+            Ok(Command {
+                com: v[0].clone(),
+                args: v,
+            })
+        }
+    }
+}
 fn com<'a>() -> Parser<'a, u8, Command> {
-    id().map(|s| Command { s })
+    (space() * list(id(), space()) - space()).convert(Command::new)
 }
 fn id<'a>() -> Parser<'a, u8, String> {
-    let com = space() * none_of(RESERVED_CHAR).repeat(1..) - space();
-    com.convert(|u8s| String::from_utf8(u8s))
+    none_of(RESERVED_CHAR)
+        .repeat(1..)
+        .convert(|u8s| String::from_utf8(u8s))
 }
 fn p_ysh<'a>() -> Parser<'a, u8, Ysh> {
     (call(p_ysh2) - sym(b'>') + id()).map(|(c, fname)| Ysh::YIn(Box::new(c), fname))
@@ -62,11 +76,7 @@ fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
         | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
         | com().map(Ysh::YCommand)
 }
-
-fn space<'a>() -> Parser<'a, u8, ()> {
-    one_of(b" \t\r\n").repeat(0..).discard()
-}
-
+/*
 fn exec_node(ysh: &Ysh) {
     match ysh {
         //https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.exec
@@ -81,4 +91,7 @@ fn exec_node(ysh: &Ysh) {
         }
         _ => todo!("other command"),
     }
+}*/
+fn space<'a>() -> Parser<'a, u8, ()> {
+    one_of(b" \t\r\n").repeat(0..).discard()
 }
