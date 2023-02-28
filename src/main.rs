@@ -1,15 +1,15 @@
 use pom::parser::*;
-use std::io;
-use std::io::{stdin, stdout, Write};
+use std::io::{stderr, stdin, stdout, Write};
+use std::process;
 
 fn main() {
     for i in 1.. {
         print!("ysh[{i}] 🐈 > ");
-        io::stdout().flush().unwrap();
+        stdout().flush().unwrap();
         let mut buf = String::new();
-        match io::stdin().read_line(&mut buf) {
+        match stdin().read_line(&mut buf) {
             Ok(_) => match p_ysh().parse(buf.as_bytes()) {
-                Ok(res) => println!("{:?}", res),
+                Ok(res) => exec_node(&res),
                 Err(e) => println!("{:?}", e),
             },
             Err(error) => println!("error: {error}"),
@@ -65,4 +65,20 @@ fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
 
 fn space<'a>() -> Parser<'a, u8, ()> {
     one_of(b" \t\r\n").repeat(0..).discard()
+}
+
+fn exec_node(ysh: &Ysh) {
+    match ysh {
+        //https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.exec
+        Ysh::YCommand(Command { s: cmd }) => {
+            match process::Command::new(format!("/bin/{cmd}")).output() {
+                Ok(msg) => {
+                    stdout().write_all(&msg.stdout).unwrap();
+                    stderr().write_all(&msg.stderr).unwrap();
+                }
+                Err(msg) => println!("err : {msg}"), //todo:change error message
+            }
+        }
+        _ => todo!("other command"),
+    }
 }
