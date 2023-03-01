@@ -14,7 +14,7 @@ pub enum Ysh {
     YSub(Box<Ysh>),           // (A)
 }
 fn indent_n(n: usize) {
-    for i in 0..n {
+    for _ in 0..n {
         print!("-");
     }
 }

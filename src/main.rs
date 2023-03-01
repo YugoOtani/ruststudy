@@ -6,7 +6,7 @@ use pipe::{PipeReader, PipeWriter};
 use rust::yparser::*;
 use std::fs::File;
 use std::io::{stdin, stdout, Write};
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
 use std::process;
 
@@ -109,7 +109,7 @@ fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
         exec_impl(ysh)
     }
 }
-fn multi_pipe(fst: &Command, ysh: &Ysh, pipes: &Vec<(PipeReader, PipeWriter)>) -> Status {
+fn multi_pipe(_: &Command, _: &Ysh, _: &Vec<(PipeReader, PipeWriter)>) -> Status {
     todo!()
 }
 fn exec_impl(ysh: &Ysh) -> Status {
@@ -178,8 +178,7 @@ fn exec_impl(ysh: &Ysh) -> Status {
         }
         Ysh::YSub(ysh) => {
             let status = exec_proc(ysh, Proc::Parent);
-            process::exit(if status == Status::Success { 0 } else { 1 });
-            Status::Fail
+            process::exit(if status == Status::Success { 0 } else { 1 })
         }
     }
 }
