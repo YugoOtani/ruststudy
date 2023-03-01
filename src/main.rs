@@ -2,7 +2,6 @@ use nix::{
     sys::wait::{wait, WaitStatus},
     unistd::{dup2, fork, ForkResult},
 };
-
 use pipe::{PipeReader, PipeWriter};
 use rust::yparser::*;
 use std::fs::File;
@@ -17,9 +16,9 @@ fn main() {
         stdout().flush().unwrap();
         let mut buf = String::new();
         match stdin().read_line(&mut buf) {
-            Ok(_) => match p_ysh().parse(buf.as_bytes()) {
+            Ok(_) => match parser_ysh().parse(buf.as_bytes()) {
                 Ok(res) => {
-                    println!("{:?}", res);
+                    print_ysh(&res);
                     exec_proc(&res, Proc::Parent);
                 }
                 Err(e) => println!("{:?}", e),
@@ -27,7 +26,7 @@ fn main() {
             Err(error) => println!("error: {error}"),
         }
     }
-    //todo: ctrl-c and ctrl-d
+    //todo: ctrl-c and ctrl-d, up key
 }
 
 const MAX_PIPE: usize = 16;
@@ -51,8 +50,6 @@ impl Status {
         }
     }
 }
-
-//https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.exec
 
 fn exec_cmd(c: &Command) -> Status {
     process::Command::new(format!("/bin/{}", c.com))
@@ -179,6 +176,10 @@ fn exec_impl(ysh: &Ysh) -> Status {
                 Status::Success
             }
         }
-        Ysh::YSub(ysh) => exec_proc(ysh, Proc::Parent),
+        Ysh::YSub(ysh) => {
+            let status = exec_proc(ysh, Proc::Parent);
+            process::exit(if status == Status::Success { 0 } else { 1 });
+            Status::Fail
+        }
     }
 }
