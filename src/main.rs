@@ -1,19 +1,15 @@
-use close_file::Closable;
 use nix::{
-    sys::{
-        uio::IoVec,
-        wait::{wait, WaitStatus},
-    },
+    sys::wait::{wait, WaitStatus},
     unistd::{dup2, fork, ForkResult},
 };
+
 use pipe::{PipeReader, PipeWriter};
-use pom::parser::*;
+use rust::yparser::*;
 use std::fs::File;
 use std::io::{stdin, stdout, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::process;
-use std::process::{ExitStatus, Output};
 
 fn main() {
     for i in 1.. {
@@ -33,26 +29,11 @@ fn main() {
     }
     //todo: ctrl-c and ctrl-d
 }
-//todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
-const RESERVED_CHAR: &[u8; 11] = b";&|<>() \n\t\r";
+
 const MAX_PIPE: usize = 16;
-#[derive(Debug)]
-enum Ysh {
-    YCommand(Command),
-    YSeq(Command, Box<Ysh>),  // A; B
-    YAnd(Command, Box<Ysh>),  // A && B
-    YOr(Command, Box<Ysh>),   // A || B
-    YPipe(Command, Box<Ysh>), // A | B
-    YIn(Box<Ysh>, String),    // A < file
-    YOut(Box<Ysh>, String),   // A > file
-    YSub(Box<Ysh>),           // (A)
-}
 
 #[derive(Debug)]
-struct Command {
-    com: String,
-    args: Vec<String>,
-}
+
 enum Proc {
     Child,
     Parent,
@@ -70,43 +51,7 @@ impl Status {
         }
     }
 }
-impl Command {
-    fn new(v: Vec<String>) -> Result<Command, String> {
-        if v.len() == 0 {
-            Err(String::from("empty command"))
-        } else {
-            Ok(Command {
-                com: v[0].clone(),
-                args: v[1..].to_vec(),
-            })
-        }
-    }
-}
-fn com<'a>() -> Parser<'a, u8, Command> {
-    (space() * list(id(), space()) - space()).convert(Command::new)
-}
-fn id<'a>() -> Parser<'a, u8, String> {
-    (space() * none_of(RESERVED_CHAR).repeat(1..) - space()).convert(|u8s| String::from_utf8(u8s))
-}
-fn p_ysh<'a>() -> Parser<'a, u8, Ysh> {
-    (call(p_ysh2) - sym(b'<') + id()).map(|(c, fname)| Ysh::YIn(Box::new(c), fname))
-        | (call(p_ysh2) - sym(b'>') + id()).map(|(c, fname)| Ysh::YOut(Box::new(c), fname))
-        | (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
-        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
-        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
-        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
-        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
-        | call(p_ysh2)
-}
-fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
-    (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
-        | (com() - end()).map(Ysh::YCommand)
-        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
-        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
-        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
-        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
-        | com().map(Ysh::YCommand)
-}
+
 //https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.exec
 
 fn exec_cmd(c: &Command) -> Status {
@@ -174,7 +119,7 @@ fn exec_impl(ysh: &Ysh) -> Status {
     match ysh {
         Ysh::YCommand(com) => {
             stdout().flush().unwrap();
-            exec_cmd(&com)
+            exec_cmd(com)
         }
         Ysh::YPipe(com, ysh) => {
             let mut pipes = vec![];
@@ -236,7 +181,4 @@ fn exec_impl(ysh: &Ysh) -> Status {
         }
         Ysh::YSub(ysh) => exec_proc(ysh, Proc::Parent),
     }
-}
-fn space<'a>() -> Parser<'a, u8, ()> {
-    one_of(b" \t\r\n").repeat(0..).discard()
 }
