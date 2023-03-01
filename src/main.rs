@@ -116,19 +116,17 @@ fn exec_cmd(c: &Command) -> Status {
     Status::Fail
 }
 fn exec_cmd_fork(c: &Command) -> Status {
-    match process::Command::new(format!("/bin/{}", c.com))
-        .args(&c.args)
-        .output()
-    {
-        Ok(output) => {
-            if output.status.success() {
-                Status::Success
-            } else {
+    match unsafe { fork() } {
+        Ok(ForkResult::Parent { child: _ }) => match wait() {
+            Ok(WaitStatus::Exited(_, 0)) => Status::Success,
+            e => {
+                println!("{:?}", e);
                 Status::Fail
             }
-        }
+        },
+        Ok(ForkResult::Child) => exec_cmd(&c),
         Err(e) => {
-            println!("{:?}", e);
+            println!("Fork failed : {e}");
             Status::Fail
         }
     }
