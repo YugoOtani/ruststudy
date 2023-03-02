@@ -57,36 +57,21 @@ fn exec_cmd(c: &Command) -> Status {
         .exec();
     Status::Fail
 }
-fn exec_cmd_fork(c: &Command) -> Status {
-    match unsafe { fork() } {
-        Ok(ForkResult::Parent { child: _ }) => match wait() {
-            Ok(WaitStatus::Exited(_, 0)) => Status::Success,
-            e => {
-                println!("{:?}", e);
-                Status::Fail
-            }
-        },
-        Ok(ForkResult::Child) => exec_cmd(&c),
-        Err(e) => {
-            println!("Fork failed : {e}");
-            Status::Fail
-        }
-    }
-}
+
 fn exec_proc(ysh: &Ysh, p: Proc) -> Status {
     let is_parent = match p {
         Proc::Child => false,
         Proc::Parent => true,
     };
     match ysh {
-        Ysh::YCommand(_) => exec_fork(ysh, is_parent),
-        Ysh::YPipe(_, _) => exec_fork(ysh, false),
-        Ysh::YIn(_, _) => exec_fork(ysh, is_parent),
-        Ysh::YOut(_, _) => exec_fork(ysh, is_parent),
-        Ysh::YSeq(_, _) => exec_fork(ysh, false),
-        Ysh::YAnd(_, _) => exec_fork(ysh, false),
-        Ysh::YOr(_, _) => exec_fork(ysh, false),
-        Ysh::YSub(_) => exec_fork(ysh, is_parent),
+        Ysh::Command(_) => exec_fork(ysh, is_parent),
+        Ysh::Pipe(_, _) => exec_fork(ysh, false),
+        Ysh::In(_, _) => exec_fork(ysh, is_parent),
+        Ysh::Out(_, _) => exec_fork(ysh, is_parent),
+        Ysh::Seq(_, _) => exec_fork(ysh, false),
+        Ysh::And(_, _) => exec_fork(ysh, false),
+        Ysh::Or(_, _) => exec_fork(ysh, false),
+        Ysh::Sub(_) => exec_fork(ysh, is_parent),
     }
 }
 fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
@@ -109,23 +94,23 @@ fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
         exec_impl(ysh)
     }
 }
-fn multi_pipe(_: &Command, _: &Ysh, _: &Vec<(PipeReader, PipeWriter)>) -> Status {
+fn multi_pipe(_: &Ysh, _: &Ysh, _: &Vec<(PipeReader, PipeWriter)>) -> Status {
     todo!()
 }
-fn exec_impl(ysh: &Ysh) -> Status {
-    match ysh {
-        Ysh::YCommand(com) => {
+fn exec_impl(y: &Ysh) -> Status {
+    match y {
+        Ysh::Command(com) => {
             stdout().flush().unwrap();
             exec_cmd(com)
         }
-        Ysh::YPipe(com, ysh) => {
+        Ysh::Pipe(ysh1, ysh2) => {
             let mut pipes = vec![];
             for _ in 0..MAX_PIPE {
                 pipes.push(pipe::pipe())
             }
-            multi_pipe(com, ysh, &pipes)
+            multi_pipe(ysh1, ysh2, &pipes)
         }
-        Ysh::YIn(ysh, fname) => {
+        Ysh::In(ysh, fname) => {
             let fd_res = File::open(fname);
             match fd_res {
                 Ok(_) => {
@@ -141,7 +126,7 @@ fn exec_impl(ysh: &Ysh) -> Status {
                 }
             }
         }
-        Ysh::YOut(ysh, fname) => {
+        Ysh::Out(ysh, fname) => {
             let fd_res = File::create(fname);
             match fd_res {
                 Ok(_) => {
@@ -157,26 +142,26 @@ fn exec_impl(ysh: &Ysh) -> Status {
                 }
             }
         }
-        Ysh::YSeq(com, ysh) => {
-            let l = exec_cmd_fork(com);
-            let r = exec_proc(ysh, Proc::Parent);
+        Ysh::Seq(ysh1, ysh2) => {
+            let l = exec_proc(ysh1, Proc::Parent);
+            let r = exec_proc(ysh2, Proc::Parent);
             l.and(r)
         }
-        Ysh::YAnd(com, ysh) => {
-            if exec_cmd_fork(com) == Status::Success {
-                exec_proc(ysh, Proc::Parent)
+        Ysh::And(ysh1, ysh2) => {
+            if exec_proc(ysh1, Proc::Parent) == Status::Success {
+                exec_proc(ysh2, Proc::Parent)
             } else {
                 Status::Fail
             }
         }
-        Ysh::YOr(com, ysh) => {
-            if exec_cmd_fork(com) == Status::Fail {
-                exec_proc(ysh, Proc::Parent)
+        Ysh::Or(ysh1, ysh2) => {
+            if exec_proc(ysh1, Proc::Parent) == Status::Fail {
+                exec_proc(ysh2, Proc::Parent)
             } else {
                 Status::Success
             }
         }
-        Ysh::YSub(ysh) => {
+        Ysh::Sub(ysh) => {
             let status = exec_proc(ysh, Proc::Parent);
             process::exit(if status == Status::Success { 0 } else { 1 })
         }

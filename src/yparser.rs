@@ -1,22 +1,20 @@
 use pom::parser::*;
-
 //todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
-const RESERVED_CHAR: &[u8; 11] = b";&|<>() \n\t\r";
+const SPACE_CHARS: &[u8; 4] = b" \n\t\r";
+const RESERVED_CHARS: &[u8; 11] = b";&|<>() \n\t\r";
 #[derive(Debug)]
 pub enum Ysh {
-    YCommand(Command),
-    YSeq(Command, Box<Ysh>),  // A; B
-    YAnd(Command, Box<Ysh>),  // A && B
-    YOr(Command, Box<Ysh>),   // A || B
-    YPipe(Command, Box<Ysh>), // A | B
-    YIn(Box<Ysh>, String),    // A < file
-    YOut(Box<Ysh>, String),   // A > file
-    YSub(Box<Ysh>),           // (A)
+    Command(Command),
+    Seq(Box<Ysh>, Box<Ysh>),  // A; B
+    And(Box<Ysh>, Box<Ysh>),  // A && B
+    Or(Box<Ysh>, Box<Ysh>),   // A || B
+    Pipe(Box<Ysh>, Box<Ysh>), // A | B
+    In(Box<Ysh>, String),     // A < file
+    Out(Box<Ysh>, String),    // A > file
+    Sub(Box<Ysh>),            // (A)
 }
 fn indent_n(n: usize) {
-    for _ in 0..n {
-        print!("-");
-    }
+    print!("{}", "--".repeat(n));
 }
 pub fn print_ysh(ysh: &Ysh) {
     fn print_com(c: &Command, n: usize) {
@@ -25,48 +23,48 @@ pub fn print_ysh(ysh: &Ysh) {
     }
     fn go(ysh: &Ysh, indent: usize) {
         match ysh {
-            Ysh::YCommand(com) => {
+            Ysh::Command(com) => {
                 print_com(com, indent);
             }
-            Ysh::YSeq(com, ysh) => {
+            Ysh::Seq(ysh1, ysh2) => {
                 indent_n(indent);
                 println!("Seq");
-                print_com(com, indent + 1);
-                go(&ysh, indent + 1);
+                go(&ysh1, indent + 1);
+                go(&ysh2, indent + 1);
             }
-            Ysh::YAnd(com, ysh) => {
+            Ysh::And(ysh1, ysh2) => {
                 indent_n(indent);
                 println!("And");
-                print_com(com, indent + 1);
-                go(ysh, indent + 1);
+                go(&ysh1, indent + 1);
+                go(&ysh2, indent + 1);
             }
-            Ysh::YOr(com, ysh) => {
+            Ysh::Or(ysh1, ysh2) => {
                 indent_n(indent);
                 println!("Or");
-                print_com(com, indent + 1);
-                go(ysh, indent + 1);
+                go(&ysh1, indent + 1);
+                go(&ysh2, indent + 1);
             }
-            Ysh::YPipe(com, ysh) => {
+            Ysh::Pipe(ysh1, ysh2) => {
                 indent_n(indent);
                 println!("Pipe");
-                print_com(com, indent + 1);
-                go(ysh, indent + 1);
+                go(&ysh1, indent + 1);
+                go(&ysh2, indent + 1);
             }
-            Ysh::YIn(ysh, s) => {
+            Ysh::In(ysh, s) => {
                 indent_n(indent);
                 println!("In");
                 go(ysh, indent + 1);
                 indent_n(indent + 1);
                 println!("{s}");
             }
-            Ysh::YOut(ysh, s) => {
+            Ysh::Out(ysh, s) => {
                 indent_n(indent);
                 println!("Out");
                 go(&ysh, indent + 1);
                 indent_n(indent + 1);
                 println!("{s}");
             }
-            Ysh::YSub(ysh) => {
+            Ysh::Sub(ysh) => {
                 indent_n(indent);
                 println!("Sub");
                 go(&ysh, indent + 1);
@@ -94,33 +92,41 @@ impl Command {
         }
     }
 }
+// S := a
+// a := b;a | b
+// b := (a) | C > STR | C
 
-fn com<'a>() -> Parser<'a, u8, Command> {
-    (space() * list(id(), space()) - space()).convert(Command::new)
+pub fn parser_ysh<'a>() -> Parser<'a, u8, Ysh> {
+    fn p_a<'a>() -> Parser<'a, u8, Ysh> {
+        (call(p_b) - sym(b';') + call(p_a)).map(|(b, a)| Ysh::Seq(Box::new(b), Box::new(a)))
+            | (call(p_b) - seq(b"&&") + call(p_a)).map(|(b, a)| Ysh::And(Box::new(b), Box::new(a)))
+            | (call(p_b) - seq(b"||") + call(p_a)).map(|(b, a)| Ysh::Or(Box::new(b), Box::new(a)))
+            | (call(p_b) - sym(b'|') + call(p_a)).map(|(b, a)| Ysh::Pipe(Box::new(b), Box::new(a)))
+            | call(p_b)
+    }
+    fn p_b<'a>() -> Parser<'a, u8, Ysh> {
+        (space() * sym(b'(') * p_a() - sym(b')') - space())
+            .map(Box::new)
+            .map(Ysh::Sub)
+            | (com() - sym(b'>') + id()).map(|(a, s)| Ysh::Out(Box::new(a), s))
+            | (com() - sym(b'<') + id()).map(|(a, s)| Ysh::In(Box::new(a), s))
+            | com()
+    }
+    p_a()
+}
+
+fn com<'a>() -> Parser<'a, u8, Ysh> {
+    (space() * list(id(), space()) - space())
+        .convert(Command::new)
+        .map(Ysh::Command)
 }
 fn id<'a>() -> Parser<'a, u8, String> {
-    (space() * none_of(RESERVED_CHAR).repeat(1..) - space()).convert(|u8s| String::from_utf8(u8s))
+    (space() * none_of(RESERVED_CHARS).repeat(1..) - space()).convert(|u8s| String::from_utf8(u8s))
 }
-pub fn parser_ysh<'a>() -> Parser<'a, u8, Ysh> {
-    (call(p_ysh2) - sym(b'<') + id()).map(|(c, fname)| Ysh::YIn(Box::new(c), fname))
-        | (call(p_ysh2) - sym(b'>') + id()).map(|(c, fname)| Ysh::YOut(Box::new(c), fname))
-        | (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
-        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
-        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
-        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
-        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
-        | call(p_ysh2)
-}
-fn p_ysh2<'a>() -> Parser<'a, u8, Ysh> {
-    (sym(b'(') * call(p_ysh2) - sym(b')')).map(|ysh| Ysh::YSub(Box::new(ysh)))
-        | (com() - end()).map(Ysh::YCommand)
-        | (com() - sym(b';') + call(p_ysh2)).map(|(s, ysh)| Ysh::YSeq(s, Box::new(ysh)))
-        | (com() - seq(b"&&") + call(p_ysh2)).map(|(s, ysh)| Ysh::YAnd(s, Box::new(ysh)))
-        | (com() - seq(b"||") + call(p_ysh2)).map(|(s, ysh)| Ysh::YOr(s, Box::new(ysh)))
-        | (com() - sym(b'|') + call(p_ysh2)).map(|(s, ysh)| Ysh::YPipe(s, Box::new(ysh)))
-        | com().map(Ysh::YCommand)
-}
-
 fn space<'a>() -> Parser<'a, u8, ()> {
-    one_of(b" \t\r\n").repeat(0..).discard()
+    one_of(SPACE_CHARS).repeat(0..).discard()
 }
+/*
+a -> C   b;a   (a)   c&&a   d|a   e>S
+結合順位 () > &&,"<",";" |
+ */
