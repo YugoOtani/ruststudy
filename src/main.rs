@@ -16,7 +16,7 @@ fn main() {
         stdout().flush().unwrap();
         let mut buf = String::new();
         match stdin().read_line(&mut buf) {
-            Ok(_) => match parser_ysh().parse(buf.as_bytes()) {
+            Ok(_) => match parse_ysh(buf) {
                 Ok(res) => {
                     print_ysh(&res);
                     exec_proc(&res, Proc::Parent);
@@ -52,6 +52,7 @@ impl Status {
 }
 
 fn exec_cmd(c: &Command) -> Status {
+    //todo :validation
     process::Command::new(format!("/bin/{}", c.com))
         .args(&c.args)
         .exec();
@@ -79,8 +80,8 @@ fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
         match unsafe { fork() } {
             Ok(ForkResult::Parent { child: _ }) => match wait() {
                 Ok(WaitStatus::Exited(_, 0)) => Status::Success,
-                e => {
-                    println!("{:?}", e);
+                _ => {
+                    //println!("{:?}", e);
                     Status::Fail
                 }
             },

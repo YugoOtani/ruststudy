@@ -1,4 +1,4 @@
-use pom::parser::*;
+
 //todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
 const SPACE_CHARS: &[u8; 4] = b" \n\t\r";
 const RESERVED_CHARS: &[u8; 11] = b";&|<>() \n\t\r";
@@ -92,41 +92,57 @@ impl Command {
         }
     }
 }
+pub fn parse_ysh(s: String) -> Result<Ysh, String> {
+    p_a(s)
+}
 // S := a
-// a := b;a | b
-// b := (a) | C > STR | C
+// a := b;a  b&&a  b|a  b||a  b
+// a>STR;a  a>STR&&a  a>STR|a  a>STR||a  a>STR
+// b := (a) | C
 
-pub fn parser_ysh<'a>() -> Parser<'a, u8, Ysh> {
-    fn p_a<'a>() -> Parser<'a, u8, Ysh> {
-        (call(p_b) - sym(b';') + call(p_a)).map(|(b, a)| Ysh::Seq(Box::new(b), Box::new(a)))
-            | (call(p_b) - seq(b"&&") + call(p_a)).map(|(b, a)| Ysh::And(Box::new(b), Box::new(a)))
-            | (call(p_b) - seq(b"||") + call(p_a)).map(|(b, a)| Ysh::Or(Box::new(b), Box::new(a)))
-            | (call(p_b) - sym(b'|') + call(p_a)).map(|(b, a)| Ysh::Pipe(Box::new(b), Box::new(a)))
-            | call(p_b)
-    }
-    fn p_b<'a>() -> Parser<'a, u8, Ysh> {
-        (space() * sym(b'(') * p_a() - sym(b')') - space())
-            .map(Box::new)
-            .map(Ysh::Sub)
-            | (com() - sym(b'>') + id()).map(|(a, s)| Ysh::Out(Box::new(a), s))
-            | (com() - sym(b'<') + id()).map(|(a, s)| Ysh::In(Box::new(a), s))
-            | com()
-    }
-    p_a()
-}
+// S := a
+// a := b;ax  b&&ax  b|ax  b||ax  bx
+// x := >STR;ax  >STR&&ax >STR|ax >STR||ax >STRx end
+// b := (a) | C
 
-fn com<'a>() -> Parser<'a, u8, Ysh> {
-    (space() * list(id(), space()) - space())
-        .convert(Command::new)
-        .map(Ysh::Command)
+enum X{
+    Seq(Ysh),And(Ysh),Pipe(Ysh),Or(Ysh)
 }
-fn id<'a>() -> Parser<'a, u8, String> {
-    (space() * none_of(RESERVED_CHARS).repeat(1..) - space()).convert(|u8s| String::from_utf8(u8s))
+fn p_a(s: String) -> Result<Ysh, String> {
+    let (b, s) = p_b(s);
+    let s = del_space(s);
+    match look_n(&s,2) {
+        Some("&&") => p_a(del_n(s,2)).and_then(|c| p_x(c,))
+            let x=p_x(s);
+        ,
+        Some("||") => {
+            p_a(del_n(s,2));
+        }
+    }
+    todo!()
 }
-fn space<'a>() -> Parser<'a, u8, ()> {
-    one_of(SPACE_CHARS).repeat(0..).discard()
+fn p_x(ysh:Ysh,s: String) -> Result<Ysh,String> {
+    todo!()
 }
-/*
-a -> C   b;a   (a)   c&&a   d|a   e>S
-結合順位 () > &&,"<",";" |
- */
+fn p_b(s: String) -> (Ysh, String) {
+    todo!()
+}
+fn look_1(s: &String) -> Option<char> {
+    s.chars().nth(0)
+}
+fn look_n(s: &String, n: usize) -> Option<&str> {
+    if s.len() < n {
+        None
+    } else {
+        Some(&s[..n])
+    }
+}
+fn del_1(s: String) -> String {
+    String::from(&s[1..])
+}
+fn del_n(s: String, n: usize) -> String {
+    String::from(&s[n..])
+}
+fn del_space(s: String) -> String {
+    s.chars().skip_while(|c| c.is_whitespace()).collect()
+}
