@@ -7,7 +7,6 @@ use rust::{yparser::*, ysh::*};
 use std::fs::File;
 use std::io::{stdin, stdout, Write};
 use std::os::fd::AsRawFd;
-use std::os::unix::process::CommandExt;
 use std::process;
 
 fn main() {
@@ -49,14 +48,6 @@ impl Status {
             _ => Status::Fail,
         }
     }
-}
-
-fn exec_cmd(c: &Command) -> Status {
-    //todo :validation
-    process::Command::new(format!("/bin/{}", c.com))
-        .args(&c.args)
-        .exec();
-    Status::Fail
 }
 
 fn exec_proc(ysh: &Ysh, p: Proc) -> Status {
@@ -102,7 +93,8 @@ fn exec_impl(y: &Ysh) -> Status {
     match y {
         Ysh::Command(com) => {
             stdout().flush().unwrap();
-            exec_cmd(com)
+            com.exec();
+            Status::Fail
         }
         Ysh::Pipe(ysh1, ysh2) => {
             let mut pipes = vec![];

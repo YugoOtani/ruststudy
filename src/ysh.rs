@@ -1,9 +1,11 @@
+use std::os::unix::process::CommandExt;
+use std::process;
 pub const RESERVED_CHARS: &str = ";&|<>()";
 pub const VALID_COMMAND: [&str; 9] = [
     "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep",
 ];
 pub enum Ysh {
-    Command(Command),
+    Command(Box<dyn Command>),
     Seq(Box<Ysh>, Box<Ysh>),  // A; B
     And(Box<Ysh>, Box<Ysh>),  // A && B
     Or(Box<Ysh>, Box<Ysh>),   // A || B
@@ -69,9 +71,7 @@ impl Ysh {
     }
     pub fn to_string(&self) -> String {
         match self {
-            Ysh::Command(c) => {
-                format!("{}", c.com)
-            }
+            Ysh::Command(c) => c.to_string(),
             Ysh::Seq(l, r) => l.to_string() + " ; " + &r.to_string(),
             Ysh::And(l, r) => l.to_string() + " && " + &r.to_string(),
             Ysh::Or(l, r) => l.to_string() + " || " + &r.to_string(),
@@ -86,23 +86,39 @@ impl Ysh {
 fn indent_n(n: usize) {
     print!("{}", "--".repeat(n));
 }
-
-#[derive(Debug)]
-pub struct Command {
-    pub com: String,
-    pub args: Vec<String>,
+pub trait Command {
+    fn debug(&self) -> String;
+    fn to_string(&self) -> String;
+    fn exec(&self);
 }
 
-impl Command {
-    fn new(com: String, args: Vec<String>) -> Result<Command, String> {
-        Ok(Command { com, args })
+struct BuiltInCommand {
+    com: String,
+    args: Vec<String>,
+}
+impl BuiltInCommand {
+    fn new(com: String, args: Vec<String>) -> Result<BuiltInCommand, String> {
+        Ok(BuiltInCommand { com, args })
     }
-    fn debug(&self) {
-        println!("Com[{},{:?}]", self.com, self.args);
+}
+
+impl Command for BuiltInCommand {
+    fn debug(&self) -> String {
+        format!("Com[{},{:?}]", self.com, self.args)
+    }
+    fn to_string(&self) -> String {
+        self.com.to_string()
+    }
+    fn exec(&self) {
+        //todo :validation
+        process::Command::new(format!("/bin/{}", self.com))
+            .args(&self.args)
+            .exec();
     }
 }
 pub fn y_com(com: &str, args: &Vec<String>) -> Result<Ysh, String> {
-    Ok(Ysh::Command(Command::new(com.to_string(), args.to_vec())?))
+    let com = BuiltInCommand::new(com.to_string(), args.to_vec())?;
+    Ok(Ysh::Command(Box::new(com)))
 }
 pub fn y_seq(l: Ysh, r: Ysh) -> Ysh {
     Ysh::Seq(Box::new(l), Box::new(r))
