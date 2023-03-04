@@ -1,5 +1,8 @@
 //todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
 const RESERVED_CHARS: &str = ";&|<>()";
+pub const VALID_COMMAND: [&str; 9] = [
+    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep",
+];
 #[derive(Debug)]
 pub enum Ysh {
     Command(Command),
@@ -79,7 +82,7 @@ pub struct Command {
 }
 
 impl Command {
-    fn new(v: Vec<String>) -> Result<Command, String> {
+    pub fn new(v: Vec<String>) -> Result<Command, String> {
         if v.len() == 0 {
             Err(String::from("empty command"))
         } else {
@@ -112,6 +115,7 @@ pub fn parse_ysh(s: String) -> Result<Ysh, String> {
 
 fn p_a(s: String) -> Result<(Ysh, String), String> {
     let (b, s) = p_b(del_space(s))?;
+    let s = del_space(s);
     match look_n(&s, 2) {
         Some("&&") => {
             let (t, s) = p_t(del_n(s, 2))?;
@@ -241,30 +245,24 @@ fn take_com(s: String) -> Result<(Ysh, String), String> {
     }
 }
 
-fn y_seq(l: Ysh, r: Ysh) -> Ysh {
+pub fn y_seq(l: Ysh, r: Ysh) -> Ysh {
     Ysh::Seq(Box::new(l), Box::new(r))
 }
-fn y_and(l: Ysh, r: Ysh) -> Ysh {
+pub fn y_and(l: Ysh, r: Ysh) -> Ysh {
     Ysh::And(Box::new(l), Box::new(r))
 }
-fn y_or(l: Ysh, r: Ysh) -> Ysh {
+pub fn y_or(l: Ysh, r: Ysh) -> Ysh {
     Ysh::Or(Box::new(l), Box::new(r))
 }
-fn y_pipe(l: Ysh, r: Ysh) -> Ysh {
+pub fn y_pipe(l: Ysh, r: Ysh) -> Ysh {
     Ysh::Pipe(Box::new(l), Box::new(r))
 }
-fn y_in(l: Ysh, s: String) -> Ysh {
+pub fn y_in(l: Ysh, s: String) -> Ysh {
     Ysh::In(Box::new(l), s)
 }
-fn y_out(l: Ysh, s: String) -> Ysh {
+pub fn y_out(l: Ysh, s: String) -> Ysh {
     Ysh::Out(Box::new(l), s)
 }
-fn y_sub(y: Ysh) -> Ysh {
+pub fn y_sub(y: Ysh) -> Ysh {
     Ysh::Sub(Box::new(y))
-}
-
-#[test]
-fn test_delspace() {
-    println!("{:?}", take_com("  ls>out".to_string()));
-    assert!(false);
 }
