@@ -1,99 +1,4 @@
-//todo:https://en.wikipedia.org/wiki/Parsing_expression_grammar
-const RESERVED_CHARS: &str = ";&|<>()";
-pub const VALID_COMMAND: [&str; 9] = [
-    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep",
-];
-#[derive(Debug)]
-pub enum Ysh {
-    Command(Command),
-    Seq(Box<Ysh>, Box<Ysh>),  // A; B
-    And(Box<Ysh>, Box<Ysh>),  // A && B
-    Or(Box<Ysh>, Box<Ysh>),   // A || B
-    Pipe(Box<Ysh>, Box<Ysh>), // A | B
-    In(Box<Ysh>, String),     // A < file
-    Out(Box<Ysh>, String),    // A > file
-    Sub(Box<Ysh>),            // (A)
-}
-fn indent_n(n: usize) {
-    print!("{}", "--".repeat(n));
-}
-pub fn print_ysh(ysh: &Ysh) {
-    fn print_com(c: &Command, n: usize) {
-        indent_n(n);
-        println!("Com[{},{:?}]", c.com, c.args);
-    }
-    fn go(ysh: &Ysh, indent: usize) {
-        match ysh {
-            Ysh::Command(com) => {
-                print_com(com, indent);
-            }
-            Ysh::Seq(ysh1, ysh2) => {
-                indent_n(indent);
-                println!("Seq");
-                go(&ysh1, indent + 1);
-                go(&ysh2, indent + 1);
-            }
-            Ysh::And(ysh1, ysh2) => {
-                indent_n(indent);
-                println!("And");
-                go(&ysh1, indent + 1);
-                go(&ysh2, indent + 1);
-            }
-            Ysh::Or(ysh1, ysh2) => {
-                indent_n(indent);
-                println!("Or");
-                go(&ysh1, indent + 1);
-                go(&ysh2, indent + 1);
-            }
-            Ysh::Pipe(ysh1, ysh2) => {
-                indent_n(indent);
-                println!("Pipe");
-                go(&ysh1, indent + 1);
-                go(&ysh2, indent + 1);
-            }
-            Ysh::In(ysh, s) => {
-                indent_n(indent);
-                println!("In");
-                go(ysh, indent + 1);
-                indent_n(indent + 1);
-                println!("{s}");
-            }
-            Ysh::Out(ysh, s) => {
-                indent_n(indent);
-                println!("Out");
-                go(&ysh, indent + 1);
-                indent_n(indent + 1);
-                println!("{s}");
-            }
-            Ysh::Sub(ysh) => {
-                indent_n(indent);
-                println!("Sub");
-                go(&ysh, indent + 1);
-            }
-        }
-    }
-    go(ysh, 0)
-}
-
-#[derive(Debug)]
-pub struct Command {
-    pub com: String,
-    pub args: Vec<String>,
-}
-
-impl Command {
-    pub fn new(v: Vec<String>) -> Result<Command, String> {
-        if v.len() == 0 {
-            Err(String::from("empty command"))
-        } else {
-            Ok(Command {
-                com: v[0].clone(),
-                args: v[1..].to_vec(),
-            })
-        }
-    }
-}
-
+use crate::ysh::*;
 pub fn parse_ysh(s: String) -> Result<Ysh, String> {
     let (ysh, s) = p_a(s.lines().collect())?;
     if s == format!("") {
@@ -233,36 +138,23 @@ fn take_string(s: String) -> Result<(String, String), String> {
 fn take_com(s: String) -> Result<(Ysh, String), String> {
     let s = del_space(s);
     let f = |c: char| RESERVED_CHARS.contains(|c2| c2 == c);
-    let splw = |s: String| s.split_whitespace().map(String::from).collect();
+    let splw = |s: String| {
+        s.split_whitespace()
+            .map(String::from)
+            .collect::<Vec<String>>()
+    };
     match s.find(f) {
         Some(0) => Err(format!("can't take command from {s}")),
         Some(i) => {
             let mut lft = s.to_string();
-            let rcom = Command::new(splw(lft.drain(..i).collect()));
-            rcom.map(move |com| (Ysh::Command(com), lft))
+            match &splw(lft.drain(..i).collect())[..] {
+                [head, tail @ ..] => Ok((y_com(head.to_string(), tail.to_vec())?, lft)),
+                _ => panic!(),
+            }
         }
-        None => Command::new(splw(s)).map(move |com| (Ysh::Command(com), "".to_string())),
+        None => match &splw(s)[..] {
+            [head, tail @ ..] => Ok((y_com(head.to_string(), tail.to_vec())?, "".to_string())),
+            _ => panic!(),
+        },
     }
-}
-
-pub fn y_seq(l: Ysh, r: Ysh) -> Ysh {
-    Ysh::Seq(Box::new(l), Box::new(r))
-}
-pub fn y_and(l: Ysh, r: Ysh) -> Ysh {
-    Ysh::And(Box::new(l), Box::new(r))
-}
-pub fn y_or(l: Ysh, r: Ysh) -> Ysh {
-    Ysh::Or(Box::new(l), Box::new(r))
-}
-pub fn y_pipe(l: Ysh, r: Ysh) -> Ysh {
-    Ysh::Pipe(Box::new(l), Box::new(r))
-}
-pub fn y_in(l: Ysh, s: String) -> Ysh {
-    Ysh::In(Box::new(l), s)
-}
-pub fn y_out(l: Ysh, s: String) -> Ysh {
-    Ysh::Out(Box::new(l), s)
-}
-pub fn y_sub(y: Ysh) -> Ysh {
-    Ysh::Sub(Box::new(y))
 }

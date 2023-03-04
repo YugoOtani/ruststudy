@@ -1,24 +1,11 @@
 pub mod yparser;
+pub mod ysh;
 #[cfg(test)]
 mod parse_test {
     use crate::yparser::*;
+    use crate::ysh::*;
     use rand::Rng;
-    impl Ysh {
-        fn to_string(&self) -> String {
-            match self {
-                Ysh::Command(c) => {
-                    format!("{}", c.com)
-                }
-                Ysh::Seq(l, r) => l.to_string() + " ; " + &r.to_string(),
-                Ysh::And(l, r) => l.to_string() + " && " + &r.to_string(),
-                Ysh::Or(l, r) => l.to_string() + " ||  " + &r.to_string(),
-                Ysh::Pipe(l, r) => l.to_string() + "  | " + &r.to_string(),
-                Ysh::In(l, r) => l.to_string() + " < " + &r,
-                Ysh::Out(l, r) => l.to_string() + "> " + &r,
-                Ysh::Sub(y) => format!("(") + &y.to_string() + ") ",
-            }
-        }
-    }
+
     const YSH_LIM: usize = 1000;
     const YSH_COMPLEXITY: usize = 2; //0 to 5
     struct Gen {
@@ -34,7 +21,9 @@ mod parse_test {
         fn gen_ysh(&mut self) -> Ysh {
             self.cnt += 1;
             if self.cnt > YSH_LIM {
-                return Ysh::Command(Command::new(Self::gen_com()).unwrap());
+                let (c, arg) = Self::gen_com();
+                return y_com(c, arg)
+                    .expect("gen_com must generate valid command : {},{:?} was given");
             }
             let mut rng = rand::thread_rng();
             match rng.gen_range(0..=6 + 6 - YSH_COMPLEXITY) {
@@ -45,16 +34,19 @@ mod parse_test {
                 4 => y_in(self.gen_ysh(), Self::gen_fname()),
                 5 => y_out(self.gen_ysh(), Self::gen_fname()),
                 6 => y_sub(self.gen_ysh()),
-                _ => Ysh::Command(Command::new(Self::gen_com()).unwrap()),
+                _ => {
+                    let (c, arg) = Self::gen_com();
+                    y_com(c, arg).expect("gen_com mut generate valid command")
+                }
             }
         }
         fn gen_fname() -> String {
             "file.txt".to_string()
         }
-        fn gen_com() -> Vec<String> {
+        fn gen_com() -> (String, Vec<String>) {
             let mut rng = rand::thread_rng();
             let l = VALID_COMMAND.len();
-            vec![VALID_COMMAND[rng.gen_range(0..l)].to_string()]
+            (VALID_COMMAND[rng.gen_range(0..l)].to_string(), vec![])
         }
     }
     #[test]

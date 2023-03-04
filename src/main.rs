@@ -3,7 +3,7 @@ use nix::{
     unistd::{dup2, fork, ForkResult},
 };
 use pipe::{PipeReader, PipeWriter};
-use rust::yparser::*;
+use rust::{yparser::*, ysh::*};
 use std::fs::File;
 use std::io::{stdin, stdout, Write};
 use std::os::fd::AsRawFd;
@@ -18,7 +18,7 @@ fn main() {
         match stdin().read_line(&mut buf) {
             Ok(_) => match parse_ysh(buf) {
                 Ok(res) => {
-                    print_ysh(&res);
+                    res.debug();
                     exec_proc(&res, Proc::Parent);
                 }
                 Err(e) => println!("{:?}", e),
