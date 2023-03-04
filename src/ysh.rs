@@ -116,11 +116,11 @@ pub fn y_or(l: Ysh, r: Ysh) -> Ysh {
 pub fn y_pipe(l: Ysh, r: Ysh) -> Ysh {
     Ysh::Pipe(Box::new(l), Box::new(r))
 }
-pub fn y_in(l: Ysh, s: String) -> Ysh {
-    Ysh::In(Box::new(l), s)
+pub fn y_in(l: Ysh, s: &str) -> Ysh {
+    Ysh::In(Box::new(l), s.to_string())
 }
-pub fn y_out(l: Ysh, s: String) -> Ysh {
-    Ysh::Out(Box::new(l), s)
+pub fn y_out(l: Ysh, s: &str) -> Ysh {
+    Ysh::Out(Box::new(l), s.to_string())
 }
 pub fn y_sub(y: Ysh) -> Ysh {
     Ysh::Sub(Box::new(y))

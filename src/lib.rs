@@ -31,8 +31,8 @@ mod parse_test {
                 1 => y_and(self.gen_ysh(), self.gen_ysh()),
                 2 => y_or(self.gen_ysh(), self.gen_ysh()),
                 3 => y_pipe(self.gen_ysh(), self.gen_ysh()),
-                4 => y_in(self.gen_ysh(), Self::gen_fname()),
-                5 => y_out(self.gen_ysh(), Self::gen_fname()),
+                4 => y_in(self.gen_ysh(), &Self::gen_fname()),
+                5 => y_out(self.gen_ysh(), &Self::gen_fname()),
                 6 => y_sub(self.gen_ysh()),
                 _ => {
                     let (c, arg) = Self::gen_com();
@@ -56,7 +56,7 @@ mod parse_test {
             g.reset();
             let s = g.gen_ysh().to_string();
             println!("{s}");
-            if let Err(e) = parse_ysh(s) {
+            if let Err(e) = parse_ysh(&s[..]) {
                 println!("{e}");
                 assert!(false);
             } else {

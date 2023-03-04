@@ -16,7 +16,7 @@ fn main() {
         stdout().flush().unwrap();
         let mut buf = String::new();
         match stdin().read_line(&mut buf) {
-            Ok(_) => match parse_ysh(buf) {
+            Ok(_) => match parse_ysh(&buf[..]) {
                 Ok(res) => {
                     res.debug();
                     exec_proc(&res, Proc::Parent);
