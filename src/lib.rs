@@ -22,8 +22,8 @@ mod parse_test {
             self.cnt += 1;
             if self.cnt > YSH_LIM {
                 let (c, arg) = Self::gen_com();
-                return y_com(c, arg)
-                    .expect("gen_com must generate valid command : {},{:?} was given");
+                return y_com(&c[..], &arg)
+                    .expect(&format!("{},arg:{:?} is not a valid command", c, arg)[..]);
             }
             let mut rng = rand::thread_rng();
             match rng.gen_range(0..=6 + 6 - YSH_COMPLEXITY) {
@@ -36,7 +36,8 @@ mod parse_test {
                 6 => y_sub(self.gen_ysh()),
                 _ => {
                     let (c, arg) = Self::gen_com();
-                    y_com(c, arg).expect("gen_com mut generate valid command")
+                    y_com(&c[..], &arg)
+                        .expect(&format!("{},arg:{:?} is not a valid command", c, arg)[..])
                 }
             }
         }

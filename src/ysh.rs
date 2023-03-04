@@ -101,7 +101,7 @@ impl Command {
         println!("Com[{},{:?}]", self.com, self.args);
     }
 }
-pub fn y_com(com: String, args: Vec<String>) -> Result<Ysh, String> {
+pub fn y_com(com: &str, args: &Vec<String>) -> Result<Ysh, String> {
     Ok(Ysh::Command(Command::new(com.to_string(), args.to_vec())?))
 }
 pub fn y_seq(l: Ysh, r: Ysh) -> Ysh {

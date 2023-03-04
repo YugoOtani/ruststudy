@@ -142,11 +142,11 @@ fn take_com(s: &str) -> Result<(Ysh, &str), String> {
     match s.find(f) {
         Some(0) => Err(format!("can't take command from {s}")),
         Some(i) => match &splw(&s[..i])[..] {
-            [head, tail @ ..] => Ok((y_com(head.to_string(), tail.to_vec())?, &s[i..])),
+            [head, tail @ ..] => Ok((y_com(head, &tail.to_vec())?, &s[i..])),
             _ => panic!(),
         },
         None => match &splw(s)[..] {
-            [head, tail @ ..] => Ok((y_com(head.to_string(), tail.to_vec())?, "")),
+            [head, tail @ ..] => Ok((y_com(head, &tail.to_vec())?, "")),
             _ => panic!(),
         },
     }
