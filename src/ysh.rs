@@ -2,8 +2,9 @@ use std::os::unix::process::CommandExt;
 use std::process;
 pub const RESERVED_CHARS: &str = ";&|<>()";
 pub const HISTORY_PATH: &str = "./command_history.txt"; //must be same as src/command/history.rs
-pub const VALID_COMMAND: [&str; 11] = [
-    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep", "sample", "history",
+pub const VALID_COMMAND: [&str; 13] = [
+    "mv", "expr", "date", "ls", "cat", "pwd", "ps", "echo", "cp", "mkdir", "sleep", "sample",
+    "history",
 ];
 pub enum Ysh {
     Command(Box<dyn Command>),
