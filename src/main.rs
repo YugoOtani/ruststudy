@@ -15,9 +15,15 @@ fn main() -> Result<(), String> {
         stdout().flush().unwrap();
         let mut buf = String::new();
         stdin().read_line(&mut buf).map_err(|e| e.to_string())?;
-        let res = parse_ysh(&buf[..])?;
-        res.debug();
-        exec_proc(&res, Proc::Parent);
+        match parse_ysh(&buf[..]) {
+            Ok(res) => {
+                res.debug();
+                exec_proc(&res, Proc::Parent);
+            }
+            Err(err) => {
+                println!("{err}");
+            }
+        }
         save_history(&buf[..])?;
     }
     Ok(())

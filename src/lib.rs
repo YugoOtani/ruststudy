@@ -1,6 +1,3 @@
-pub mod command {
-    pub mod history;
-}
 pub mod yparser;
 pub mod ysh;
 #[cfg(test)]
