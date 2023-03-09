@@ -1,13 +1,10 @@
 use std::os::unix::process::CommandExt;
 use std::process;
 pub const RESERVED_CHARS: &str = ";&|<>()";
-pub const VALID_COMMAND: [&str; 10] = [
-    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep", "sample",
+pub const HISTORY_PATH: &str = "./command_history.txt"; //must be same as src/command/history.rs
+pub const VALID_COMMAND: [&str; 11] = [
+    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep", "sample", "history",
 ];
-const BUILTIN_COMMAND: [&str; 9] = [
-    "ls", "cat", "pwd", "ps", "echo", "cp", "kill", "mkdir", "sleep",
-];
-const SAMPLE_COMMAND: [&str; 1] = ["sample"];
 pub enum Ysh {
     Command(Box<dyn Command>),
     Seq(Box<Ysh>, Box<Ysh>),  // A; B
@@ -95,14 +92,14 @@ pub trait Command {
     fn to_string(&self) -> String;
     fn exec(&self);
 }
-struct SampleCom {
+struct MyCommand {
     com: String,
     args: Vec<String>,
 }
-impl SampleCom {
-    fn new(com: String, args: Vec<String>) -> Result<SampleCom, String> {
-        if SAMPLE_COMMAND.contains(&&com[..]) {
-            Ok(SampleCom { com, args })
+impl MyCommand {
+    fn new(com: String, args: Vec<String>) -> Result<MyCommand, String> {
+        if VALID_COMMAND.contains(&&com[..]) {
+            Ok(MyCommand { com, args })
         } else {
             Err(format!(
                 "{}(arg:{:?}) this is not a built in command",
@@ -112,54 +109,22 @@ impl SampleCom {
     }
 }
 
-impl Command for SampleCom {
+impl Command for MyCommand {
     fn debug(&self) -> String {
-        format!("SampleCom[{},{:?}]", self.com, self.args)
+        format!("MyCom[{},{:?}]", self.com, self.args)
     }
     fn to_string(&self) -> String {
         self.com.to_string()
     }
     fn exec(&self) {
-        process::Command::new(format!("./src/command/{}", self.com))
+        process::Command::new(format!("./src/bin/{}", self.com))
             .args(&self.args)
             .exec();
     }
 }
 
-struct BuiltInCommand {
-    com: String,
-    args: Vec<String>,
-}
-impl BuiltInCommand {
-    fn new(com: String, args: Vec<String>) -> Result<BuiltInCommand, String> {
-        if BUILTIN_COMMAND.contains(&&com[..]) {
-            Ok(BuiltInCommand { com, args })
-        } else {
-            Err(format!(
-                "{}(arg:{:?}) this is not a built in command",
-                com, args
-            ))
-        }
-    }
-}
-
-impl Command for BuiltInCommand {
-    fn debug(&self) -> String {
-        format!("BuitInCom[{},{:?}]", self.com, self.args)
-    }
-    fn to_string(&self) -> String {
-        self.com.to_string()
-    }
-    fn exec(&self) {
-        process::Command::new(format!("/bin/{}", self.com))
-            .args(&self.args)
-            .exec();
-    }
-}
 pub fn y_com(com: &str, args: &Vec<String>) -> Result<Ysh, String> {
-    if let Ok(y) = BuiltInCommand::new(com.to_string(), args.to_vec()) {
-        Ok(Ysh::Command(Box::new(y)))
-    } else if let Ok(y) = SampleCom::new(com.to_string(), args.to_vec()) {
+    if let Ok(y) = MyCommand::new(com.to_string(), args.to_vec()) {
         Ok(Ysh::Command(Box::new(y)))
     } else {
         Err(format!("{}(args:{:?}) is not a valid command", com, args))

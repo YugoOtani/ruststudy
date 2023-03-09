@@ -5,26 +5,22 @@ use nix::{
 use pipe::{PipeReader, PipeWriter};
 use rust::{yparser::*, ysh::*};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{stdin, stdout, Write};
 use std::os::fd::AsRawFd;
 use std::process;
-
-fn main() {
+fn main() -> Result<(), String> {
     for i in 1.. {
         print!("ysh[{i}] 🐈 > ");
         stdout().flush().unwrap();
         let mut buf = String::new();
-        match stdin().read_line(&mut buf) {
-            Ok(_) => match parse_ysh(&buf[..]) {
-                Ok(res) => {
-                    res.debug();
-                    exec_proc(&res, Proc::Parent);
-                }
-                Err(e) => println!("{:?}", e),
-            },
-            Err(error) => println!("error: {error}"),
-        }
+        stdin().read_line(&mut buf).map_err(|e| e.to_string())?;
+        let res = parse_ysh(&buf[..])?;
+        res.debug();
+        exec_proc(&res, Proc::Parent);
+        save_history(&buf[..])?;
     }
+    Ok(())
     //todo: ctrl-c and ctrl-d, up key
 }
 
@@ -49,21 +45,23 @@ impl Status {
         }
     }
 }
-
+fn save_history(s: &str) -> Result<(), String> {
+    let mut f = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(HISTORY_PATH)
+        .map_err(|e| e.to_string())?;
+    f.write(s.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(())
+}
 fn exec_proc(ysh: &Ysh, p: Proc) -> Status {
     let is_parent = match p {
         Proc::Child => false,
         Proc::Parent => true,
     };
     match ysh {
-        Ysh::Command(_) => exec_fork(ysh, is_parent),
-        Ysh::Pipe(_, _) => exec_fork(ysh, false),
-        Ysh::In(_, _) => exec_fork(ysh, is_parent),
-        Ysh::Out(_, _) => exec_fork(ysh, is_parent),
-        Ysh::Seq(_, _) => exec_fork(ysh, false),
-        Ysh::And(_, _) => exec_fork(ysh, false),
-        Ysh::Or(_, _) => exec_fork(ysh, false),
-        Ysh::Sub(_) => exec_fork(ysh, is_parent),
+        Ysh::Command(_) | Ysh::In(_, _) | Ysh::Out(_, _) | Ysh::Sub(_) => exec_fork(ysh, is_parent),
+        Ysh::Pipe(_, _) | Ysh::Seq(_, _) | Ysh::And(_, _) | Ysh::Or(_, _) => exec_fork(ysh, false),
     }
 }
 fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
@@ -71,10 +69,7 @@ fn exec_fork(ysh: &Ysh, fork_and_exec: bool) -> Status {
         match unsafe { fork() } {
             Ok(ForkResult::Parent { child: _ }) => match wait() {
                 Ok(WaitStatus::Exited(_, 0)) => Status::Success,
-                _ => {
-                    //println!("{:?}", e);
-                    Status::Fail
-                }
+                _ => Status::Fail,
             },
             Ok(ForkResult::Child) => exec_impl(ysh),
             Err(e) => {
@@ -109,7 +104,6 @@ fn exec_impl(y: &Ysh) -> Status {
                 Ok(_) => {
                     if let Ok(fd) = fd_res {
                         dup2(fd.as_raw_fd(), stdin().as_raw_fd()).expect("failed to duplicate");
-                        //todo:change to pattern match
                     } //close file here
                     exec_proc(ysh, Proc::Child)
                 }
